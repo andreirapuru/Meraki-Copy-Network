@@ -8,7 +8,23 @@ uma confirmação antes de cada corte.
 > aplicação reduz a interrupção ao preparar no destino as configurações globais
 > selecionadas e reaplicar o snapshot logo após o *claim*.
 
-## Instalação no Windows
+## Uso rápido no Windows
+
+Qualquer usuário pode clonar, baixar ou copiar este repositório para uma pasta
+local. Com Python 3.11 ou superior instalado e disponível pelo comando
+`python`, abra o PowerShell na pasta do projeto e execute:
+
+```powershell
+.\start.ps1
+```
+
+Na primeira execução, o script cria o ambiente isolado `.venv`, instala as
+dependências necessárias e inicia a interface em `http://127.0.0.1:8765`.
+Nas execuções seguintes, ele apenas verifica o ambiente e inicia a aplicação.
+Também recria automaticamente o ambiente virtual caso ele esteja incompleto ou
+tenha sido removido.
+
+## Instalação manual
 
 Requer Python 3.11 ou superior. Em PowerShell, na pasta do projeto:
 
@@ -18,9 +34,6 @@ python -m venv .venv
 pip install -e ".[windows,dev]"
 meraki-switch-migrator
 ```
-
-O `start.ps1` recria automaticamente o ambiente virtual caso ele esteja
-incompleto ou tenha sido removido.
 
 Abra `http://127.0.0.1:8765`. A chave da Dashboard API precisa ter acesso de
 leitura e configuração para networks, devices e switching da organização.
