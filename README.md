@@ -19,6 +19,9 @@ pip install -e ".[windows,dev]"
 meraki-switch-migrator
 ```
 
+O `start.ps1` recria automaticamente o ambiente virtual caso ele esteja
+incompleto ou tenha sido removido.
+
 Abra `http://127.0.0.1:8765`. A chave da Dashboard API precisa ter acesso de
 leitura e configuração para networks, devices e switching da organização.
 
