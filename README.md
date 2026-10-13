@@ -35,4 +35,3 @@ leitura e configuração para networks, devices e switching da organização.
 Os grupos marcados na prévia substituem a configuração equivalente no destino
 pela da origem. Grupos que a API não pode ler/reaplicar com segurança são
 explicitamente bloqueados; nunca são omitidos silenciosamente.
-
