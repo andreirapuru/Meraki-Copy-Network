@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Meraki Switch Migrator</title><link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main>
+  <header><div><p class="eyebrow">Cisco Meraki · MS</p><h1>Migrador de switches</h1></div><button id="logout" class="quiet" hidden>Sair</button></header>
+  <section id="connect-card" class="card"><h2>Conectar com segurança</h2><p>A chave fica apenas nesta sessão local e não é gravada.</p><form id="connect-form"><label>Chave Dashboard API<input id="api-key" type="password" autocomplete="off" required></label><button>Conectar</button></form></section>
+  <section id="planner" class="card" hidden>
+    <h2>Planejar migração</h2><p class="notice">As configurações selecionadas da origem substituem os itens equivalentes no destino.</p>
+    <div class="grid"><label>Organização<select id="organization"></select></label><label>Network de origem<select id="source-network"></select></label><label>Network de destino<select id="destination-network"></select></label></div>
+    <h3>Switches e stacks de origem</h3><div id="switch-list" class="check-list">Selecione uma network de origem.</div>
+    <h3>Grupos de configuração</h3><div id="group-list" class="check-list">
+      {% for group in groups %}<label class="group {% if not group.readable %}disabled{% endif %}"><input type="checkbox" value="{{ group.id }}" {% if not group.readable %}disabled{% endif %}><span><strong>{{ group.label }}</strong><small>{{ group.detail or 'Será comparado e replicado.' }}</small></span></label>{% endfor %}
+    </div>
+    <button id="preview">Criar prévia segura</button>
+  </section>
+  <section id="preview-card" class="card" hidden><h2>Prévia</h2><div id="preview-content"></div><button id="create-job">Aprovar lote</button></section>
+  <section id="job-card" class="card" hidden><h2>Acompanhamento</h2><p id="job-state"></p><div id="next-unit"></div><button id="confirm-unit" class="danger" hidden>Confirmar corte desta unidade</button><ol id="events"></ol></section>
+</main><template id="switch-template"><label><input type="checkbox"><span></span></label></template><script src="/static/app.js"></script>
+</body></html>
