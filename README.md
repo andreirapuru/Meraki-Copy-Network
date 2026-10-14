@@ -49,6 +49,12 @@ leitura e configuração para networks, devices e switching da organização.
   membros parciais de um stack são bloqueados.
 - Em falha, a fila para e tenta reverter todos os itens concluídos, em ordem
   inversa, além da configuração global do destino.
+- Após o *claim* de um Catalyst, a Dashboard API pode levar alguns minutos para
+  aceitar operações específicas do equipamento. A aplicação espera até 15
+  minutos e consulta também o inventário da network de destino. Se a API ainda
+  não tiver convergido, o lote fica **interrompido** — sem remover o equipamento
+  novamente — e a tela oferece **Recuperar configuração pendente**. Essa ação
+  somente reaplica e valida o snapshot no destino já confirmado.
 
 Os grupos marcados na prévia substituem a configuração equivalente no destino
 pela da origem. Grupos que a API não pode ler/reaplicar com segurança são

@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .models import Job, Plan
+from .models import Job, JobState, Plan
 from .security import Cipher
 
 
@@ -56,6 +56,13 @@ class Store:
         if not row:
             raise KeyError(f"Job {job_id} não encontrado")
         return Job.from_dict(json.loads(row[0]))
+
+    def recoverable_jobs(self) -> list[tuple[Job, str]]:
+        """Return interrupted jobs with their update timestamp, newest first."""
+        with self._connect() as db:
+            rows = db.execute("SELECT payload, updated_at FROM jobs ORDER BY updated_at DESC").fetchall()
+        jobs = [(Job.from_dict(json.loads(payload)), updated_at) for payload, updated_at in rows]
+        return [item for item in jobs if item[0].state in {JobState.INTERRUPTED, JobState.FAILED}]
 
     def event(self, job_id: str, level: str, message: str) -> None:
         with self._connect() as db:

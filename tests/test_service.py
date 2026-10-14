@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from app.meraki import MerakiPendingError
 from app.models import JobState
 from app.security import TestCipher
 from app.service import MigrationService
@@ -71,3 +72,27 @@ async def test_partial_stack_is_rejected(service: MigrationService) -> None:
 
 async def _stack():
     return [{"id": "stack-1", "name": "Core", "serials": ["Q1", "Q2"]}]
+
+
+async def test_claim_propagation_timeout_pauses_without_rollback(service: MigrationService) -> None:
+    class PendingMeraki(FakeMeraki):
+        async def wait_for_network(self, serial, network, attempts=30):
+            raise MerakiPendingError("propagação pendente")
+
+    api = PendingMeraki()
+    plan = await service.build_plan(api, "org", "source", "destination", ["Q1"], ["ports"])
+    job = await service.create_job(plan.id)
+    result = await service.confirm_current(api, job.id, "Q1")
+    assert result.state == JobState.INTERRUPTED
+    assert api.device_network["Q1"] == "destination"
+
+
+async def test_restore_reapplies_a_failed_post_claim_unit(service: MigrationService) -> None:
+    api = FakeMeraki()
+    plan = await service.build_plan(api, "org", "source", "destination", ["Q1"], ["ports"])
+    job = await service.create_job(plan.id)
+    api.device_network["Q1"] = "destination"
+    job.state = JobState.FAILED
+    service.store.save_job(job)
+    result = await service.restore_current(api, job.id, "Q1")
+    assert result.state == JobState.COMPLETED

@@ -5,7 +5,7 @@ from collections import defaultdict
 from typing import Any
 
 from .configuration import GROUPS, apply_device_group, apply_network_group, capture_device_group, capture_network_group, diff
-from .meraki import MerakiClient, MerakiError
+from .meraki import MerakiClient, MerakiError, MerakiPendingError
 from .models import Job, JobState, MigrationUnit, Plan
 from .storage import Store
 
@@ -108,6 +108,16 @@ class MigrationService:
         self.store.event(job.id, "info", "Lote criado e aguardando confirmação da primeira unidade.")
         return job
 
+    def recoverable_jobs(self) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        for job, updated_at in self.store.recoverable_jobs():
+            plan = self.store.get_plan(job.plan_id)
+            if job.current_index >= len(plan.units):
+                continue
+            unit = plan.units[job.current_index]
+            items.append({"job": job.to_dict(), "unit": {"id": unit.id, "label": unit.label}, "updatedAt": updated_at})
+        return items
+
     async def confirm_current(self, api: MerakiClient, job_id: str, unit_id: str) -> Job:
         async with self._locks[job_id]:
             job, plan = self.store.get_job(job_id), self.store.get_plan(self.store.get_job(job_id).plan_id)
@@ -129,6 +139,14 @@ class MigrationService:
                     job.state = JobState.WAITING_CONFIRMATION
                     self.store.event(job.id, "info", "Unidade concluída; aguardando confirmação da próxima.")
                 self.store.save_job(job)
+            except MerakiPendingError as exc:
+                # A recently claimed Catalyst can be visible in the Dashboard
+                # before device-specific API endpoints have converged. Do not
+                # guess its location and remove it again.
+                self.store.event(job.id, "warning", str(exc))
+                job.state = JobState.INTERRUPTED
+                self.store.save_job(job)
+                self.store.event(job.id, "warning", "Migração pausada sem rollback automático; use a recuperação após a API confirmar o equipamento.")
             except Exception as exc:
                 self.store.event(job.id, "error", f"Falha: {exc}")
                 job.state = JobState.ROLLING_BACK
@@ -137,6 +155,42 @@ class MigrationService:
                 job.state = JobState.FAILED
                 self.store.save_job(job)
                 self.store.event(job.id, "error", "Rollback finalizado; lote marcado como falho.")
+            return job
+
+    async def restore_current(self, api: MerakiClient, job_id: str, unit_id: str) -> Job:
+        """Resume only the post-claim restore for an interrupted/failed unit.
+
+        This path never removes or claims a device. It is intentionally limited
+        to a device that the Dashboard API can prove is already in the planned
+        destination network.
+        """
+        async with self._locks[job_id]:
+            job = self.store.get_job(job_id)
+            plan = self.store.get_plan(job.plan_id)
+            if job.state not in {JobState.INTERRUPTED, JobState.FAILED}:
+                raise MerakiError("A recuperação só está disponível para um lote interrompido ou falho")
+            if job.current_index >= len(plan.units) or plan.units[job.current_index].id != unit_id:
+                raise MerakiError("A recuperação não corresponde à unidade pendente")
+            unit = plan.units[job.current_index]
+            job.state = JobState.RUNNING
+            self.store.save_job(job)
+            self.store.event(job.id, "info", f"Recuperação confirmada para {unit.label}; verificando destino sem mover o equipamento.")
+            try:
+                await self._restore_claimed_unit(api, job, plan, unit)
+                await self._verify(api, plan, unit)
+                job.completed_unit_ids.append(unit.id)
+                job.current_index += 1
+                job.state = JobState.COMPLETED if job.current_index == len(plan.units) else JobState.WAITING_CONFIRMATION
+                self.store.event(job.id, "success", f"Configurações restauradas e validadas em {unit.label}.")
+                self.store.save_job(job)
+            except MerakiPendingError as exc:
+                job.state = JobState.INTERRUPTED
+                self.store.save_job(job)
+                self.store.event(job.id, "warning", str(exc))
+            except Exception as exc:
+                job.state = JobState.FAILED
+                self.store.save_job(job)
+                self.store.event(job.id, "error", f"Recuperação falhou sem mover o equipamento: {exc}")
             return job
 
     async def _run_unit(self, api: MerakiClient, job: Job, plan: Plan, unit: MigrationUnit) -> None:
@@ -148,14 +202,33 @@ class MigrationService:
         for serial in unit.serials:
             await api.remove_device(plan.source_network_id, serial)
         self.store.event(job.id, "info", f"Equipamento removido da origem: {unit.label}.")
+        self.store.event(job.id, "info", f"Reivindicando {unit.label} na network de destino.")
         await api.claim_devices(plan.destination_network_id, unit.serials)
+        self.store.event(job.id, "info", "Claim aceito; aguardando a propagação do equipamento na Dashboard API.")
+        await self._restore_claimed_unit(api, job, plan, unit)
+        await self._verify(api, plan, unit)
+        self.store.event(job.id, "success", f"{unit.label} migrado e validado.")
+
+    async def _restore_claimed_unit(self, api: MerakiClient, job: Job, plan: Plan, unit: MigrationUnit) -> None:
         for serial in unit.serials:
             await api.wait_for_network(serial, plan.destination_network_id)
             for group, value in plan.source_snapshot["devices"][serial].items():
+                await self._apply_device_group_when_ready(api, job, serial, group, value)
+
+    async def _apply_device_group_when_ready(self, api: MerakiClient, job: Job, serial: str, group: str, value: Any) -> None:
+        """Device APIs may be unavailable for a few minutes after a claim."""
+        for attempt in range(30):
+            try:
                 self.store.event(job.id, "info", f"Reaplicando {GROUPS[group].label} em {serial}.")
                 await apply_device_group(api, serial, group, value)
-        await self._verify(api, plan, unit)
-        self.store.event(job.id, "success", f"{unit.label} migrado e validado.")
+                return
+            except MerakiError as exc:
+                if exc.status_code not in {404, 409}:
+                    raise
+                if attempt == 0:
+                    self.store.event(job.id, "warning", f"A API do dispositivo ainda não está pronta para {GROUPS[group].label}; aguardando.")
+                await asyncio.sleep(10)
+        raise MerakiPendingError(f"A API do dispositivo {serial} ainda não está pronta para restaurar {GROUPS[group].label}")
 
     async def _verify(self, api: MerakiClient, plan: Plan, unit: MigrationUnit) -> None:
         for serial in unit.serials:

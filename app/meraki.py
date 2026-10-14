@@ -14,6 +14,10 @@ class MerakiError(RuntimeError):
         self.status_code = status_code
 
 
+class MerakiPendingError(MerakiError):
+    """The Dashboard accepted a change but the device API is not ready yet."""
+
+
 class MerakiClient:
     """Small API v1 client with bounded retry and Link-header pagination."""
 
@@ -100,10 +104,25 @@ class MerakiClient:
     async def update_device(self, serial: str, payload: dict[str, Any]) -> Any:
         return await self.request("PUT", f"/devices/{serial}", json=payload)
 
-    async def wait_for_network(self, serial: str, network_id: str, attempts: int = 30) -> None:
-        for _ in range(attempts):
+    async def device_in_network(self, serial: str, network_id: str) -> bool:
+        """Check both views because a recent Catalyst claim can lag on GET /devices."""
+        try:
             if (await self.device(serial)).get("networkId") == network_id:
+                return True
+        except MerakiError as exc:
+            # A 404 just after a claim is expected while inventory propagates.
+            if exc.status_code != 404:
+                raise
+        return any(device.get("serial") == serial for device in await self.devices(network_id))
+
+    async def wait_for_network(self, serial: str, network_id: str, attempts: int = 90) -> None:
+        """Wait up to 15 minutes for eventual consistency after a device claim."""
+        for _ in range(attempts):
+            if await self.device_in_network(serial, network_id):
                 return
             await asyncio.sleep(10)
-        raise MerakiError(f"{serial} não entrou na network de destino dentro do prazo")
+        raise MerakiPendingError(
+            f"{serial} foi reivindicado, mas a Dashboard API ainda não confirmou a associação "
+            "com a network de destino após 15 minutos"
+        )
 

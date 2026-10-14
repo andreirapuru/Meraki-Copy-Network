@@ -177,6 +177,14 @@ async def jobs(plan_id: str):
         raise HTTPException(404, str(exc)) from exc
 
 
+@app.get("/api/jobs/recoverable")
+async def recoverable_jobs(api: MerakiClient = Depends(api_for_session)):
+    try:
+        return {"jobs": service.recoverable_jobs()}
+    finally:
+        await api.close()
+
+
 @app.get("/api/jobs/{job_id}")
 async def job(job_id: str):
     try:
@@ -190,6 +198,16 @@ async def confirm(job_id: str, unit_id: str, api: MerakiClient = Depends(api_for
     try:
         # Execute in request context: the response only returns after a safe terminal/waiting state.
         return (await service.confirm_current(api, job_id, unit_id)).to_dict()
+    except (KeyError, MerakiError) as exc:
+        raise error(exc) from exc
+    finally:
+        await api.close()
+
+
+@app.post("/api/jobs/{job_id}/units/{unit_id}/restore")
+async def restore(job_id: str, unit_id: str, api: MerakiClient = Depends(api_for_session)):
+    try:
+        return (await service.restore_current(api, job_id, unit_id)).to_dict()
     except (KeyError, MerakiError) as exc:
         raise error(exc) from exc
     finally:
