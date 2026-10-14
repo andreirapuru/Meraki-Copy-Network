@@ -1,8 +1,8 @@
 # Meraki Switch Migrator
 
-Aplicação local para migrar switches Cisco Meraki MS (inclusive stacks) entre
-networks existentes da mesma organização. Ela não guarda a chave de API e exige
-uma confirmação antes de cada migração.
+Aplicação local para migrar switches Cisco Meraki MS **avulsos** entre networks
+existentes da mesma organização. Ela não guarda a chave de API e exige uma
+confirmação antes de cada migração.
 
 ![Exemplo da tela de planejamento de migração](docs/images/migration-plan-example.png)
 
@@ -45,8 +45,8 @@ leitura e configuração para networks, devices e switching da organização.
 - A chave fica somente na memória da sessão e é descartada após 30 minutos de
   inatividade, logout ou reinício.
 - Os snapshots e o baseline do destino são protegidos com DPAPI no Windows.
-- Networks associadas a Configuration Templates, organizações diferentes e
-  membros parciais de um stack são bloqueados.
+- Networks associadas a Configuration Templates e organizações diferentes são
+  bloqueadas.
 - Em falha, a fila para e tenta reverter todos os itens concluídos, em ordem
   inversa, além da configuração global do destino.
 - Após o *claim* de um Catalyst, a Dashboard API pode levar alguns minutos para
@@ -59,6 +59,32 @@ leitura e configuração para networks, devices e switching da organização.
 Os grupos marcados na prévia substituem a configuração equivalente no destino
 pela da origem. Grupos que a API não pode ler/reaplicar com segurança são
 explicitamente bloqueados; nunca são omitidos silenciosamente.
+
+## Migração de switches que pertencem a um stack
+
+**Não migre um stack como uma unidade usando esta ferramenta.** A Meraki informa
+que stacks não podem ser movidos entre networks; é necessário desfazê-los antes
+de mover seus membros. Consulte a [documentação oficial de movimentação de
+dispositivos](https://documentation.meraki.com/General_Administration/Inventory_and_Devices/Moving_Devices_between_Networks).
+
+Procedimento recomendado:
+
+1. Planeje uma janela de manutenção e registre a composição, o cabeamento e as
+   configurações do stack atual.
+2. Na Dashboard de origem, desfaça o stack e confirme que cada membro aparece
+   como switch avulso.
+3. Crie uma nova prévia nesta ferramenta e selecione os membros individualmente.
+   Marque **Configurações de portas** para capturar, reaplicar e validar as
+   portas de cada serial.
+4. Migre os membros para a network de destino e aguarde a conclusão/validação
+   de cada um.
+5. Quando todos estiverem online no destino e com firmware compatível, recrie o
+   stack pela Dashboard e execute a validação operacional.
+
+As configurações de stack, agregações de links e L3 não são migradas por esta
+versão; revise e recrie esses elementos manualmente no destino. Para Catalyst
+em firmware CS, siga também os requisitos específicos de energia, firmware e
+cabeamento na [documentação de switch stacks](https://documentation.meraki.com/Switching/MS_-_Switches/Design_and_Configure/Architecture_and_Best_Practices/Switch_Stacks).
 
 ## Recuperar uma migração interrompida
 
