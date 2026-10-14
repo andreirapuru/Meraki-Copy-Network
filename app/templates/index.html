@@ -8,6 +8,7 @@
 <main>
   <header><div><p class="eyebrow">Cisco Meraki · MS</p><h1>Migrador de switches</h1></div><button id="logout" class="quiet" hidden>Sair</button></header>
   <section id="connect-card" class="card"><h2>Conectar com segurança</h2><p>A chave fica apenas nesta sessão local e não é gravada.</p><form id="connect-form"><label>Chave Dashboard API<input id="api-key" type="password" autocomplete="off" required></label><button>Conectar</button></form></section>
+  <section id="recovery-card" class="card" hidden><h2>Recuperar configuração pendente</h2><p>Estas unidades já foram movimentadas ou tiveram uma tentativa interrompida. A recuperação apenas restaura a configuração no destino; ela não move o equipamento.</p><div id="recovery-list"></div></section>
   <section id="planner" class="card" hidden>
     <h2>Planejar migração</h2><p class="notice">As configurações selecionadas da origem substituem os itens equivalentes no destino.</p>
     <div class="grid"><label>Organização<select id="organization"></select></label><label>Network de origem<select id="source-network"></select></label><label>Network de destino<select id="destination-network"></select></label></div>
@@ -19,6 +20,5 @@
   </section>
   <section id="preview-card" class="card" hidden><h2>Prévia</h2><div id="preview-content"></div><button id="create-job">Aprovar lote</button></section>
   <section id="job-card" class="card" hidden><h2>Acompanhamento</h2><p id="job-state"></p><div id="next-unit"></div><button id="confirm-unit" class="danger" hidden>Confirmar corte desta unidade</button><ol id="events"></ol></section>
-  <section id="recovery-card" class="card" hidden><h2>Recuperar configuração pendente</h2><p>Estas unidades já foram movimentadas ou tiveram uma tentativa interrompida. A recuperação apenas restaura a configuração no destino; ela não move o equipamento.</p><div id="recovery-list"></div></section>
 </main><template id="switch-template"><label><input type="checkbox"><span></span></label></template><script src="/static/app.js"></script>
 </body></html>
