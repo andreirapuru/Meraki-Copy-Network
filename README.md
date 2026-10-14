@@ -59,3 +59,20 @@ leitura e configuração para networks, devices e switching da organização.
 Os grupos marcados na prévia substituem a configuração equivalente no destino
 pela da origem. Grupos que a API não pode ler/reaplicar com segurança são
 explicitamente bloqueados; nunca são omitidos silenciosamente.
+
+## Recuperar uma migração interrompida
+
+Após um *claim*, especialmente de um Catalyst, a Dashboard pode exibir o
+equipamento no destino antes de seus endpoints de configuração estarem prontos.
+Nesse caso, o lote será marcado como **interrompido** e o equipamento permanece
+onde está; a ferramenta não tenta removê-lo novamente.
+
+1. Confirme na Dashboard que o switch está na network de destino.
+2. Não mova o equipamento manualmente entre networks.
+3. Reinicie a aplicação com `.\start.ps1`, conecte a mesma chave API e procure
+   o cartão **Recuperar configuração pendente**, acima do planejamento.
+4. Escolha **Restaurar** para a unidade indicada. A ferramenta verifica a
+   associação no destino, reaplica o snapshot selecionado e valida o resultado.
+
+Se o switch estiver novamente na network de origem, não use a recuperação:
+analise o log do lote e crie uma nova prévia antes de tentar outra migração.
