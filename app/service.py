@@ -86,7 +86,7 @@ class MigrationService:
 
         warnings = [
             "Configurações selecionadas da origem substituirão os itens equivalentes no destino.",
-            "O corte de cada unidade exige confirmação e poderá causar indisponibilidade temporária.",
+            "A migração de cada unidade exige confirmação e poderá causar indisponibilidade temporária.",
         ]
         plan = Plan.new(
             organization_id=organization_id,
@@ -127,7 +127,7 @@ class MigrationService:
                 raise MerakiError("A confirmação não corresponde à próxima unidade da fila")
             job.state = JobState.RUNNING
             self.store.save_job(job)
-            self.store.event(job.id, "info", f"Corte confirmado para {plan.units[job.current_index].label}.")
+            self.store.event(job.id, "info", f"Migração confirmada para {plan.units[job.current_index].label}.")
             try:
                 await self._run_unit(api, job, plan, plan.units[job.current_index])
                 job.completed_unit_ids.append(unit_id)

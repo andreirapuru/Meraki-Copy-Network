@@ -2,7 +2,7 @@
 
 Aplicação local para migrar switches Cisco Meraki MS (inclusive stacks) entre
 networks existentes da mesma organização. Ela não guarda a chave de API e exige
-uma confirmação antes de cada corte.
+uma confirmação antes de cada migração.
 
 ![Exemplo da tela de planejamento de migração](docs/images/migration-plan-example.png)
 
